@@ -313,15 +313,16 @@ int gaussfunc(int m, int n, double *p, double *dy, double **dvec, void *vars)
   y = v->y;
   ey = v->ey;
 
-    sig1 = 11.7*11.7;
-    sig2 = 8.8*8.8;
+   sig1 = 11.7;
+    sig2 = 8.8;
     
     for (i=0; i<m; i++) {
         xc = x[i]-p[2];
-        incre=(1-exp(-xc*xc/sig1));rise=incre*incre*incre*sqrt(incre);
+        incre=(1-exp(-xc/sig1));
+            rise=incre*incre*incre*sqrt(fabs(incre));
         if(i>=32)
             
-            dy[i] = (y[i] - p[1]*rise*exp(-xc*xc/sig2) - p[0])/ey[i];
+            dy[i] = (y[i] - p[1]*rise*exp(-xc/sig2) - p[0])/ey[i];
         else
             dy[i]=(y[i]-p[0])/ey[i];
     }
@@ -335,14 +336,14 @@ int testgaussfit(int num)
     int i=0;
     double x[128];
     double y[128];
-    double t0=3*((double)rand()/0x7fffffff -0.5)+32;
+    double t0=1*((double)rand()/0x7fffffff -0.5)+32;
     
-    double N0=0*gaussrand()+250;
+    double N0=0*gaussrand()+250/0.058; //Pulse height: convert to 250mV pulse height of (1809keV) signal.
     double raise=0;
     double y0=0;
     
-    double digi_preci=0.052/28;
-    
+    double digi_preci=0.052; //digi-precision assumed to be 52 micro-volts.
+    /*
     FILE*f0;
     char line[50];
     char txtname [50];
@@ -355,31 +356,32 @@ int testgaussfit(int num)
         i++;
     }
     fclose(f0);
-    
+    */
    // printf("%d\n",num);
     for (i=0;i<128;i++)
     {
         x[i]=i;
-        y0=0.05*((double)rand()/0x7fffffff -0.5)+0.1*(sin(i)+sin(2*i)+sin(3*i));
+        y0=0.5*((double)rand()/0x7fffffff -0.5)+0.1*(sin(i)+sin(2*i)+sin(3*i));
         if(i>=t0)
         {
-            raise=1-exp(-(x[i]-t0)*(x[i]-t0)/(11.7*11.7));
+            raise=1-exp(-(x[i]-t0)/(11.7));
         }
         
-       y[i]=y[i]*35+N0*raise*raise*raise*sqrt(raise)*exp(-(x[i]-t0)*(x[i]-t0)/(8.8*8.8));
-        // y[i]=y0+N0*raise*raise*raise*sqrt(raise)*exp(-(x[i]-t0)*(x[i]-t0)/(8.8*8.8));
+       //y[i]=y[i]*1000+N0*raise*raise*raise*sqrt(raise)*exp(-(x[i]-t0)/(8.8));
+         y[i]=y0+N0*raise*raise*raise*sqrt(raise)*exp(-(x[i]-t0)/(8.8));
         if(y[i]>=0)
         y[i]=y[i]-fmod(y[i],digi_preci);
         else
         y[i]=y[i]+fmod(y[i],digi_preci);
        
     }
+   // printf("%f\n",t0);
     double ey[128];
     double peddle;
     for(i=0;i<t0;i++)
     {peddle=peddle+y[i];}
     peddle=peddle/t0;
-    double p[] = {peddle, 245, 30};
+    double p[] = {peddle, 250/0.06, 30};
     
     double pactual[] = {0.0, N0, t0};
     double perror[3];
@@ -402,15 +404,16 @@ int testgaussfit(int num)
     v.ey = ey;
     
     
-    
+  //   printf("%d\n",num+20);
     status = mpfit(gaussfunc, 128, 3, p, pars, 0, (void *) &v, &result);
-    
-    
-    p[1]=p[1]*1809/250;
+  //  printf("%d\n",num+30);
+    /*
+    p[1]=p[1]*1809*0.058/250;
     p[2]=p[2]-t0;
     
     FILE*fp=fopen("delta2.txt","a");
     fprintf(fp,"%f\t%f\n",p[1],p[2]);fclose(fp);
+    */
     return 0;
 
 }
@@ -433,12 +436,13 @@ int main(int argc, char *argv[])
    double start = omp_get_wtime();
     
     srand(time(((void *)0)));
-    omp_set_dynamic(0);
-    omp_set_num_threads(8);
-    #pragma omp parallel
+   omp_set_dynamic(0);
+   omp_set_num_threads(8);
+  
+  #pragma omp parallel
     {
-        #pragma omp for
-     for(int ii=1; ii<1200; ii++)
+       #pragma omp for
+     for(int ii=1; ii<100000; ii++)
         testgaussfit(ii);
         
    
